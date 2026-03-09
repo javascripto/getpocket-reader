@@ -1,5 +1,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
+  CircleX,
   Grid2x2,
   Heart,
   List,
@@ -512,9 +514,26 @@ export function SavesPage() {
               <Input
                 value={searchTerm}
                 onChange={event => setSearchTerm(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Escape') {
+                    setSearchTerm('');
+                  }
+                }}
                 placeholder="Buscar por título, URL ou tag"
-                className="pl-9"
+                className="pl-9 pr-9"
               />
+              {searchTerm ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-1/2 right-1 h-7 w-7 -translate-y-1/2 rounded-full"
+                  onClick={() => setSearchTerm('')}
+                  aria-label="Limpar busca"
+                >
+                  <CircleX className="h-4 w-4" />
+                </Button>
+              ) : null}
             </div>
 
             <div className="flex items-center gap-2">
@@ -627,29 +646,45 @@ export function SavesPage() {
                             : undefined
                         }
                       >
-                        {row.map(item => (
-                          <PocketItemCard
-                            key={item.id}
-                            item={item}
-                            viewMode={viewMode}
-                            onOpen={id => navigate(`/reader/${id}`)}
-                            onToggleFavorite={entry => {
-                              void toggleFavorite(entry);
-                            }}
-                            onToggleArchive={entry => {
-                              void toggleArchive(entry);
-                            }}
-                            onRequestTagEdit={entry => {
-                              setItemPendingTagEdit(entry);
-                              setTagSelection(entry.tags);
-                              setNewTagName('');
-                            }}
-                            themeColors={themeColors}
-                            onRequestDelete={entry => {
-                              setItemPendingDelete(entry);
-                            }}
-                          />
-                        ))}
+                        <AnimatePresence
+                          initial={false}
+                          mode="popLayout"
+                        >
+                          {row.map(item => (
+                            <motion.div
+                              key={item.id}
+                              layout
+                              initial={{ opacity: 0, y: 10, scale: 0.985 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -8, scale: 0.985 }}
+                              transition={{
+                                duration: 0.2,
+                                ease: 'easeOut',
+                              }}
+                            >
+                              <PocketItemCard
+                                item={item}
+                                viewMode={viewMode}
+                                onOpen={id => navigate(`/reader/${id}`)}
+                                onToggleFavorite={entry => {
+                                  void toggleFavorite(entry);
+                                }}
+                                onToggleArchive={entry => {
+                                  void toggleArchive(entry);
+                                }}
+                                onRequestTagEdit={entry => {
+                                  setItemPendingTagEdit(entry);
+                                  setTagSelection(entry.tags);
+                                  setNewTagName('');
+                                }}
+                                themeColors={themeColors}
+                                onRequestDelete={entry => {
+                                  setItemPendingDelete(entry);
+                                }}
+                              />
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
                       </div>
                     </div>
                   );
