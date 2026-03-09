@@ -6,6 +6,7 @@ import {
   Heart,
   List,
   Loader2,
+  Menu,
   Plus,
   Pocket,
   Search,
@@ -76,6 +77,7 @@ export function SavesPage() {
   const [newTags, setNewTags] = useState('');
   const [newStatus, setNewStatus] = useState<PocketItemStatus>('unread');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
   const [isClearSecondDialogOpen, setIsClearSecondDialogOpen] = useState(false);
   const [itemPendingDelete, setItemPendingDelete] = useState<PocketItem | null>(
@@ -279,6 +281,130 @@ export function SavesPage() {
     setRenameTagValue('');
   }
 
+  function SidebarContent({ onAction }: { onAction?: () => void }) {
+    return (
+      <>
+        <div className="mb-5 space-y-2 text-base">
+          <button
+            type="button"
+            className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${sidebarFilter === 'all' ? 'bg-accent font-semibold text-accent-foreground' : 'text-foreground hover:bg-accent/60'}`}
+            onClick={() => {
+              setSidebarFilter('all');
+              onAction?.();
+            }}
+          >
+            <span>Todos</span>
+            <span>{items.length}</span>
+          </button>
+          <button
+            type="button"
+            className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${sidebarFilter === 'unread' ? 'bg-accent font-semibold text-accent-foreground' : 'text-foreground hover:bg-accent/60'}`}
+            onClick={() => {
+              setSidebarFilter('unread');
+              onAction?.();
+            }}
+          >
+            <span>Unread</span>
+            <span>{items.filter(item => item.status === 'unread').length}</span>
+          </button>
+          <button
+            type="button"
+            className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${sidebarFilter === 'archive' ? 'bg-accent font-semibold text-accent-foreground' : 'text-foreground hover:bg-accent/60'}`}
+            onClick={() => {
+              setSidebarFilter('archive');
+              onAction?.();
+            }}
+          >
+            <span>Archive</span>
+            <span>
+              {items.filter(item => item.status === 'archive').length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${onlyFavorites ? 'bg-accent font-semibold text-accent-foreground' : 'text-foreground hover:bg-accent/60'}`}
+            onClick={() => {
+              setOnlyFavorites(value => !value);
+              onAction?.();
+            }}
+          >
+            <span className="inline-flex items-center gap-2">
+              <Heart className="h-4 w-4" /> Favoritos
+            </span>
+            <span>{items.filter(item => item.favorite).length}</span>
+          </button>
+        </div>
+
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Tags
+        </h2>
+        <div className="flex max-h-[45svh] flex-wrap gap-2 overflow-auto">
+          <button
+            type="button"
+            className={`rounded-full border px-2 py-1 text-xs transition-colors ${!selectedTag ? 'border-primary bg-accent text-accent-foreground' : 'border-border text-foreground hover:bg-accent/50'}`}
+            onClick={() => {
+              setSelectedTag(null);
+              setOnlyUntagged(false);
+              onAction?.();
+            }}
+          >
+            Todas
+          </button>
+          <button
+            type="button"
+            className={`rounded-full border px-2 py-1 text-xs transition-colors ${onlyUntagged ? 'border-primary bg-accent text-accent-foreground' : 'border-border text-foreground hover:bg-accent/50'}`}
+            onClick={() => {
+              setOnlyUntagged(value => !value);
+              setSelectedTag(null);
+              onAction?.();
+            }}
+          >
+            Sem tags ({items.filter(item => item.tags.length === 0).length})
+          </button>
+          {tagCloud.map(([tag, count]) => (
+            <ContextMenu key={tag}>
+              <ContextMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={`rounded-full border px-2 py-1 text-xs transition-colors ${selectedTag === tag ? 'border-primary bg-accent text-accent-foreground' : 'border-border text-foreground hover:bg-accent/50'}`}
+                  onClick={() => {
+                    setSelectedTag(tag);
+                    setOnlyUntagged(false);
+                    onAction?.();
+                  }}
+                >
+                  {tag} ({count})
+                </button>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem
+                  onSelect={() => {
+                    setTagPendingRename(tag);
+                    setRenameTagValue(tag);
+                  }}
+                >
+                  Renomear tag
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          ))}
+        </div>
+        <Button
+          variant="ghost"
+          className="mt-4 w-full text-xs text-destructive hover:bg-destructive/10"
+          onClick={() => {
+            setIsClearDialogOpen(true);
+            onAction?.();
+          }}
+          disabled={isImporting}
+        >
+          Limpar base local
+        </Button>
+      </>
+    );
+  }
+
   return (
     <main
       className="flex min-h-svh flex-col"
@@ -296,11 +422,21 @@ export function SavesPage() {
       >
         <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#ef4056] text-white">
-              <Pocket className="h-7 w-7" />
+            <Button
+              variant="outline"
+              size="icon"
+              className="lg:hidden"
+              onClick={() => setIsMobileMenuOpen(true)}
+              aria-label="Abrir menu lateral"
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#ef4056] text-white sm:h-10 sm:w-10">
+              <Pocket className="h-6 w-6 sm:h-7 sm:w-7" />
             </span>
-            <strong className="text-2xl font-semibold tracking-tight">
-              pocket offline
+            <strong className="hidden text-2xl font-semibold tracking-tight sm:block">
+              Pocket
             </strong>
           </div>
 
@@ -393,115 +529,32 @@ export function SavesPage() {
         </div>
       </header>
 
+      <Dialog
+        open={isMobileMenuOpen}
+        onOpenChange={setIsMobileMenuOpen}
+      >
+        <DialogContent className="!top-0 !left-0 !h-svh !max-h-none !w-[86vw] !max-w-[320px] !translate-x-0 !translate-y-0 !rounded-none p-4 sm:!max-w-[360px]">
+          <div
+            className="rounded-2xl border p-4 pt-12"
+            style={{
+              borderColor: themeColors.border,
+              background: themeColors.panelBackground,
+            }}
+          >
+            <SidebarContent onAction={() => setIsMobileMenuOpen(false)} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="mx-auto grid w-full max-w-[1400px] flex-1 grid-cols-1 gap-6 px-5 py-6 lg:grid-cols-[290px_1fr]">
         <aside
-          className="rounded-3xl border p-5"
+          className="hidden rounded-3xl border p-5 lg:block"
           style={{
             borderColor: themeColors.border,
             background: themeColors.panelBackground,
           }}
         >
-          <div className="mb-5 space-y-2 text-base">
-            <button
-              type="button"
-              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${sidebarFilter === 'all' ? 'bg-accent font-semibold text-accent-foreground' : 'text-foreground hover:bg-accent/60'}`}
-              onClick={() => setSidebarFilter('all')}
-            >
-              <span>Todos</span>
-              <span>{items.length}</span>
-            </button>
-            <button
-              type="button"
-              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${sidebarFilter === 'unread' ? 'bg-accent font-semibold text-accent-foreground' : 'text-foreground hover:bg-accent/60'}`}
-              onClick={() => setSidebarFilter('unread')}
-            >
-              <span>Unread</span>
-              <span>
-                {items.filter(item => item.status === 'unread').length}
-              </span>
-            </button>
-            <button
-              type="button"
-              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${sidebarFilter === 'archive' ? 'bg-accent font-semibold text-accent-foreground' : 'text-foreground hover:bg-accent/60'}`}
-              onClick={() => setSidebarFilter('archive')}
-            >
-              <span>Archive</span>
-              <span>
-                {items.filter(item => item.status === 'archive').length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${onlyFavorites ? 'bg-accent font-semibold text-accent-foreground' : 'text-foreground hover:bg-accent/60'}`}
-              onClick={() => setOnlyFavorites(value => !value)}
-            >
-              <span className="inline-flex items-center gap-2">
-                <Heart className="h-4 w-4" /> Favoritos
-              </span>
-              <span>{items.filter(item => item.favorite).length}</span>
-            </button>
-          </div>
-
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Tags
-          </h2>
-          <div className="flex max-h-[45svh] flex-wrap gap-2 overflow-auto">
-            <button
-              type="button"
-              className={`rounded-full border px-2 py-1 text-xs transition-colors ${!selectedTag ? 'border-primary bg-accent text-accent-foreground' : 'border-border text-foreground hover:bg-accent/50'}`}
-              onClick={() => {
-                setSelectedTag(null);
-                setOnlyUntagged(false);
-              }}
-            >
-              Todas
-            </button>
-            <button
-              type="button"
-              className={`rounded-full border px-2 py-1 text-xs transition-colors ${onlyUntagged ? 'border-primary bg-accent text-accent-foreground' : 'border-border text-foreground hover:bg-accent/50'}`}
-              onClick={() => {
-                setOnlyUntagged(value => !value);
-                setSelectedTag(null);
-              }}
-            >
-              Sem tags ({items.filter(item => item.tags.length === 0).length})
-            </button>
-            {tagCloud.map(([tag, count]) => (
-              <ContextMenu key={tag}>
-                <ContextMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className={`rounded-full border px-2 py-1 text-xs transition-colors ${selectedTag === tag ? 'border-primary bg-accent text-accent-foreground' : 'border-border text-foreground hover:bg-accent/50'}`}
-                    onClick={() => {
-                      setSelectedTag(tag);
-                      setOnlyUntagged(false);
-                    }}
-                  >
-                    {tag} ({count})
-                  </button>
-                </ContextMenuTrigger>
-                <ContextMenuContent>
-                  <ContextMenuItem
-                    onSelect={() => {
-                      setTagPendingRename(tag);
-                      setRenameTagValue(tag);
-                    }}
-                  >
-                    Renomear tag
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
-            ))}
-          </div>
-          <Button
-            variant="ghost"
-            className="mt-4 w-full text-xs text-destructive hover:bg-destructive/10"
-            onClick={() => setIsClearDialogOpen(true)}
-            disabled={isImporting}
-          >
-            Limpar base local
-          </Button>
+          <SidebarContent />
         </aside>
 
         <section>

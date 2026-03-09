@@ -111,7 +111,13 @@ export function ReaderPage() {
         style={{ background: colors.appBackground, color: colors.appText }}
       >
         <p className="mb-4">Post não encontrado.</p>
-        <Button onClick={() => navigate('/')}>Voltar para saves</Button>
+        <Button
+          onClick={() => navigate('/')}
+          aria-label="Voltar para saves"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Voltar para saves</span>
+        </Button>
       </main>
     );
   }
@@ -133,9 +139,10 @@ export function ReaderPage() {
             variant="ghost"
             className="absolute left-0 text-current"
             onClick={() => navigate('/')}
+            aria-label="Voltar para saves"
           >
             <ArrowLeft className="h-4 w-4" />
-            Voltar para saves
+            <span className="hidden sm:inline">Voltar para saves</span>
           </Button>
 
           <div className="flex items-center gap-2">

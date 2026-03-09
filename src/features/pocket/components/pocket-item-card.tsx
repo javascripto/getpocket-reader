@@ -199,7 +199,7 @@ export function PocketItemCard({
 
   return (
     <article
-      className="flex items-start gap-4 rounded-2xl border p-3 shadow-sm transition hover:shadow-md"
+      className="flex flex-col gap-3 rounded-2xl border p-3 shadow-sm transition hover:shadow-md sm:flex-row sm:items-start sm:gap-4"
       style={{
         borderColor: themeColors.border,
         background: themeColors.cardBackground,
@@ -244,7 +244,10 @@ export function PocketItemCard({
         </div>
       </button>
 
-      <div className="ml-2 flex shrink-0 items-center gap-1">
+      <div
+        className="flex w-full items-center justify-end gap-1 border-t pt-2 sm:ml-2 sm:w-auto sm:shrink-0 sm:border-t-0 sm:pt-0"
+        style={{ borderColor: themeColors.border }}
+      >
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
