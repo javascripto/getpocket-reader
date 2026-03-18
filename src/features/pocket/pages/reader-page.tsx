@@ -267,7 +267,7 @@ export function ReaderPage() {
                   </h2>
                 ) : null}
                 <div
-                  className={`max-h-[70svh] overflow-y-auto ${cleanContentFormat === 'markdown' ? '' : 'whitespace-pre-wrap'}`}
+                  className={`max-h-[70svh] overflow-y-auto ${cleanContentFormat === 'plain' ? 'whitespace-pre-wrap' : ''}`}
                   style={{
                     fontFamily: readerFont,
                     fontSize: `${readerPreferences.fontSize}px`,
