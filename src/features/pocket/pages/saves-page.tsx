@@ -41,6 +41,7 @@ import { AppSettingsDialog } from '@/features/pocket/components/app-settings-dia
 import { PocketItemCard } from '@/features/pocket/components/pocket-item-card';
 import { usePocket } from '@/features/pocket/context/pocket-context';
 import { readerThemeColors } from '@/features/pocket/lib/reader-theme';
+import { normalizePocketUrl, searchContentCache } from '@/lib/pocket-db';
 import type { PocketItem, PocketItemStatus, PocketViewMode } from '@/types';
 
 type SidebarFilter = 'all' | 'unread' | 'archive';
@@ -129,6 +130,11 @@ export function SavesPage() {
   const [resultScrollElement, setResultScrollElement] =
     useState<HTMLDivElement | null>(null);
   const [resultWidth, setResultWidth] = useState(0);
+  const [cachedSearchMatches, setCachedSearchMatches] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [isSearchingCachedContent, setIsSearchingCachedContent] =
+    useState(false);
   const hasRestoredScrollRef = useRef(false);
   const themeColors = readerThemeColors(activeTheme);
 
@@ -175,10 +181,12 @@ export function SavesPage() {
       return (
         item.title.toLowerCase().includes(loweredTerm) ||
         item.url.toLowerCase().includes(loweredTerm) ||
-        item.tags.some(tag => tag.toLowerCase().includes(loweredTerm))
+        item.tags.some(tag => tag.toLowerCase().includes(loweredTerm)) ||
+        cachedSearchMatches.has(normalizePocketUrl(item.url))
       );
     });
   }, [
+    cachedSearchMatches,
     items,
     onlyFavorites,
     onlyUntagged,
@@ -209,6 +217,37 @@ export function SavesPage() {
   useEffect(() => {
     localStorage.setItem('pocket-view-mode-v1', viewMode);
   }, [viewMode]);
+
+  useEffect(() => {
+    const loweredTerm = searchTerm.trim().toLowerCase();
+    if (!loweredTerm) {
+      setCachedSearchMatches(new Set());
+      setIsSearchingCachedContent(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsSearchingCachedContent(true);
+
+    const timeoutId = window.setTimeout(() => {
+      void searchContentCache(loweredTerm)
+        .then(matches => {
+          if (!cancelled) {
+            setCachedSearchMatches(new Set(matches));
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsSearchingCachedContent(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [searchTerm]);
 
   useEffect(() => {
     const nextParams = new URLSearchParams();
@@ -728,6 +767,9 @@ export function SavesPage() {
                   <CircleX className="h-4 w-4" />
                 </Button>
               ) : null}
+              {searchTerm && isSearchingCachedContent ? (
+                <Loader2 className="pointer-events-none absolute top-1/2 right-10 h-4 w-4 -translate-y-1/2 animate-spin" />
+              ) : null}
             </div>
 
             <div className="flex items-center gap-2">
@@ -760,6 +802,21 @@ export function SavesPage() {
               >
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Importando
+              </Badge>
+            ) : null}
+            {searchTerm ? (
+              <Badge
+                variant="secondary"
+                className="inline-flex items-center gap-1"
+              >
+                {isSearchingCachedContent ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Search className="h-3 w-3" />
+                )}
+                {isSearchingCachedContent
+                  ? 'Buscando no cache...'
+                  : 'Busca inclui conteudo em cache'}
               </Badge>
             ) : null}
           </div>

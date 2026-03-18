@@ -26,6 +26,10 @@ function normalizeUrl(url: string): string {
   return url.trim().toLowerCase().replace(/\/+$/, '');
 }
 
+export function normalizePocketUrl(url: string): string {
+  return normalizeUrl(url);
+}
+
 function toId(url: string): string {
   const normalized = normalizeUrl(url);
   const bytes = new TextEncoder().encode(normalized);
@@ -163,5 +167,26 @@ export async function upsertContentCacheEntries(
     await tx.done;
   } catch {
     // Silent no-op
+  }
+}
+
+export async function searchContentCache(rawTerm: string): Promise<string[]> {
+  const normalizedTerm = rawTerm.trim().toLowerCase();
+  if (!normalizedTerm) {
+    return [];
+  }
+
+  try {
+    const db = await database;
+    const entries = await db.getAll(STORE_CONTENT_CACHE);
+
+    return entries
+      .filter(entry => {
+        const haystack = `${entry.title}\n${entry.content}`.toLowerCase();
+        return haystack.includes(normalizedTerm);
+      })
+      .map(entry => entry.url);
+  } catch {
+    return [];
   }
 }
