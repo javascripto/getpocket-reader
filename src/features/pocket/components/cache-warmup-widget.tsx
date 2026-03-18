@@ -25,7 +25,7 @@ function formatEstimatedTime(remainingMs: number | null) {
 }
 
 export function CacheWarmupWidget() {
-  const { isCacheWarming, cacheWarmupProgress, cancelCacheWarmup } = usePocket();
+  const { isCacheWarming, cacheWarmupProgress } = usePocket();
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
@@ -90,13 +90,7 @@ export function CacheWarmupWidget() {
             variant="ghost"
             size="icon-sm"
             className="shrink-0"
-            onClick={() => {
-              if (isCacheWarming) {
-                cancelCacheWarmup();
-              }
-
-              setDismissed(true);
-            }}
+            onClick={() => setDismissed(true)}
             aria-label="Fechar progresso do cache"
           >
             <X className="h-4 w-4" />

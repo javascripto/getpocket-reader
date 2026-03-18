@@ -5,7 +5,8 @@ import TurndownService from 'turndown';
 import { getContentCache, setContentCache } from './pocket-db';
 
 const DARKREAD_PROXY = 'https://darkread-proxy.vercel.app';
-// const DARKREAD_PROXY = 'http://localhost:3000';
+const ORIGINAL_CONTENT_TIMEOUT_MS = 8000;
+const DARKREAD_PROXY_TIMEOUT_MS = 12000;
 
 const turndown = new TurndownService({
   headingStyle: 'atx',
@@ -22,6 +23,24 @@ class DarkreadProxyError extends Error {
 
 export function isDarkreadProxyError(error: unknown): boolean {
   return error instanceof DarkreadProxyError;
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number,
+) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 // Fenced code blocks with auto language detection
@@ -43,7 +62,22 @@ turndown.addRule('fencedCodeBlock', {
 });
 
 async function fetchViaDarkread(url: string): Promise<{ title: string; content: string }> {
-  const res = await fetch(`${DARKREAD_PROXY}/?cors=true&url=${encodeURIComponent(url)}`);
+  let res: Response;
+
+  try {
+    res = await fetchWithTimeout(
+      `${DARKREAD_PROXY}/?cors=true&url=${encodeURIComponent(url)}`,
+      {},
+      DARKREAD_PROXY_TIMEOUT_MS,
+    );
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new DarkreadProxyError('Tempo esgotado ao obter conteúdo via darkread proxy.');
+    }
+
+    throw error;
+  }
+
   if (!res.ok) throw new DarkreadProxyError('Falha ao obter conteúdo via darkread proxy.');
 
   const html = await res.text();
@@ -78,7 +112,11 @@ export async function fetchCleanContent(targetUrl: string): Promise<{
   }
 
   try {
-    const response = await fetch(targetUrl, { mode: 'cors' });
+    const response = await fetchWithTimeout(
+      targetUrl,
+      { mode: 'cors' },
+      ORIGINAL_CONTENT_TIMEOUT_MS,
+    );
     if (!response.ok) {
       throw new Error('Falha ao baixar conteúdo original.');
     }
