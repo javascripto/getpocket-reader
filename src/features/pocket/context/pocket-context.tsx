@@ -40,7 +40,7 @@ import type {
   ReaderPreferences,
 } from '@/types';
 
-const CACHE_WARMUP_DELAY_MS = 100;
+const CACHE_WARMUP_DELAY_MS = 1500;
 
 function estimateRemainingMs(
   startedAt: number,
