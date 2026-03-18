@@ -52,6 +52,7 @@ export function ReaderPage() {
     exportCsv,
     exportContentCache,
     warmContentCache,
+    cancelCacheWarmup,
   } = usePocket();
 
   const [readerMode, setReaderMode] = useState<ReaderMode>('clean');
@@ -221,6 +222,7 @@ export function ReaderPage() {
                     exportCsv={exportCsv}
                     exportContentCache={exportContentCache}
                     warmContentCache={warmContentCache}
+                    cancelCacheWarmup={cancelCacheWarmup}
                   />
                 </div>
               </TooltipTrigger>

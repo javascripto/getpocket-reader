@@ -40,7 +40,27 @@ import type {
   ReaderPreferences,
 } from '@/types';
 
-const CACHE_WARMUP_DELAY_MS = 1000;
+const CACHE_WARMUP_DELAY_MS = 100;
+
+function estimateRemainingMs(
+  startedAt: number,
+  processedPending: number,
+  remainingPending: number,
+) {
+  if (processedPending <= 0 || remainingPending <= 0) {
+    return null;
+  }
+
+  const elapsedMs = Date.now() - startedAt;
+  if (elapsedMs <= 0) {
+    return null;
+  }
+
+  return Math.max(
+    Math.round((elapsedMs / processedPending) * remainingPending),
+    0,
+  );
+}
 
 interface CreatePostInput {
   title: string;
@@ -71,6 +91,7 @@ interface PocketContextValue {
   exportCsv: () => void;
   exportContentCache: () => Promise<void>;
   warmContentCache: () => Promise<void>;
+  cancelCacheWarmup: () => void;
   clearAll: () => Promise<void>;
 }
 
@@ -87,6 +108,7 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
   const [readerPreferences, setReaderPreferencesState] =
     useState<ReaderPreferences>(loadReaderPreferences);
   const isCacheWarmingRef = useRef(false);
+  const cancelCacheWarmupRef = useRef(false);
   const [systemPrefersDark, setSystemPrefersDark] = useState(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -360,24 +382,34 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
     }
 
     isCacheWarmingRef.current = true;
+    cancelCacheWarmupRef.current = false;
     setIsCacheWarming(true);
     const initialCachedCount = uniqueItems.length - pendingItems.length;
+    const startedAt = Date.now();
     setCacheWarmupProgress({
       total: uniqueItems.length,
       cached: initialCachedCount,
+      processed: initialCachedCount,
       remaining: pendingItems.length,
       success: 0,
       alreadyCached: initialCachedCount,
       failed: 0,
       currentTitle: '',
+      startedAt,
+      estimatedRemainingMs: null,
     });
 
     try {
       let success = 0;
       let alreadyCached = initialCachedCount;
       let failed = 0;
+      let processedPending = 0;
 
       for (const [index, item] of pendingItems.entries()) {
+        if (cancelCacheWarmupRef.current) {
+          break;
+        }
+
         setCacheWarmupProgress(current =>
           current
             ? {
@@ -390,16 +422,22 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
         const cached = await getContentCache(item.url);
         if (cached) {
           alreadyCached += 1;
+          processedPending += 1;
+          const processed = initialCachedCount + processedPending;
+          const remaining = Math.max(pendingItems.length - processedPending, 0);
           setCacheWarmupProgress(current =>
             current
               ? {
-                ...current,
+                  ...current,
                   cached: alreadyCached + success,
-                  remaining: Math.max(
-                    current.total - (alreadyCached + success),
-                    0,
-                  ),
+                  processed,
+                  remaining,
                   alreadyCached,
+                  estimatedRemainingMs: estimateRemainingMs(
+                    startedAt,
+                    processedPending,
+                    remaining,
+                  ),
                 }
               : current,
           );
@@ -415,20 +453,31 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        processedPending += 1;
+        const processed = initialCachedCount + processedPending;
+        const remaining = Math.max(pendingItems.length - processedPending, 0);
+
         setCacheWarmupProgress(current =>
           current
             ? {
                 ...current,
                 cached: initialCachedCount + success,
-                remaining: Math.max(
-                  current.total - (initialCachedCount + success),
-                  0,
-                ),
+                processed,
+                remaining,
                 success,
                 failed,
+                estimatedRemainingMs: estimateRemainingMs(
+                  startedAt,
+                  processedPending,
+                  remaining,
+                ),
               }
             : current,
         );
+
+        if (cancelCacheWarmupRef.current) {
+          break;
+        }
 
         if (index < pendingItems.length - 1) {
           await new Promise(resolve =>
@@ -437,9 +486,13 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      toast.success(
-        `Cache concluido: ${initialCachedCount + success} em cache, ${success} novos, ${failed} falhas`,
-      );
+      if (cancelCacheWarmupRef.current) {
+        toast.message('Aquecimento do cache pausado');
+      } else {
+        toast.success(
+          `Cache concluido: ${initialCachedCount + success} em cache, ${success} novos, ${failed} falhas`,
+        );
+      }
     } finally {
       isCacheWarmingRef.current = false;
       setIsCacheWarming(false);
@@ -448,11 +501,35 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
           ? {
               ...current,
               currentTitle: '',
+              processed: cancelCacheWarmupRef.current
+                ? current.processed
+                : current.total,
+              remaining: cancelCacheWarmupRef.current ? current.remaining : 0,
+              estimatedRemainingMs: cancelCacheWarmupRef.current ? null : 0,
             }
           : current,
       );
+      cancelCacheWarmupRef.current = false;
     }
   }, [items]);
+
+  const cancelCacheWarmup = useCallback(() => {
+    if (!isCacheWarmingRef.current) {
+      return;
+    }
+
+    cancelCacheWarmupRef.current = true;
+    setIsCacheWarming(false);
+    setCacheWarmupProgress(current =>
+      current
+        ? {
+            ...current,
+            currentTitle: '',
+            estimatedRemainingMs: null,
+          }
+        : current,
+    );
+  }, []);
 
   const clearAll = useCallback(async () => {
     await clearAllItems();
@@ -483,6 +560,7 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
       exportCsv,
       exportContentCache,
       warmContentCache,
+      cancelCacheWarmup,
       clearAll,
     }),
     [
@@ -507,6 +585,7 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
       toggleFavorite,
       updatePostTags,
       warmContentCache,
+      cancelCacheWarmup,
       renameTagAcrossPosts,
     ],
   );

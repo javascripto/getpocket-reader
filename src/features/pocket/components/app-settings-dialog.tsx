@@ -12,22 +12,39 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { ReaderFontFamily, ReaderPreferences, ReaderTheme } from '@/types';
+import type {
+  ContentCacheWarmupProgress,
+  ReaderFontFamily,
+  ReaderPreferences,
+  ReaderTheme,
+} from '@/types';
+
+function formatEstimatedTime(remainingMs: number | null) {
+  if (remainingMs === null) {
+    return 'Calculando tempo restante...';
+  }
+
+  if (remainingMs <= 0) {
+    return 'Concluido';
+  }
+
+  const totalSeconds = Math.ceil(remainingMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+}
 
 interface AppSettingsDialogProps {
   isImporting: boolean;
   isCacheImporting: boolean;
   isCacheWarming: boolean;
   isLoading: boolean;
-  cacheWarmupProgress: {
-    total: number;
-    cached: number;
-    remaining: number;
-    success: number;
-    alreadyCached: number;
-    failed: number;
-    currentTitle: string;
-  } | null;
+  cacheWarmupProgress: ContentCacheWarmupProgress | null;
   readerPreferences: ReaderPreferences;
   setReaderPreferences: (patch: Partial<ReaderPreferences>) => void;
   importCsvFile: (file: File) => Promise<void>;
@@ -35,6 +52,7 @@ interface AppSettingsDialogProps {
   exportCsv: () => void;
   exportContentCache: () => Promise<void>;
   warmContentCache: () => Promise<void>;
+  cancelCacheWarmup: () => void;
 }
 
 export function AppSettingsDialog({
@@ -50,13 +68,19 @@ export function AppSettingsDialog({
   exportCsv,
   exportContentCache,
   warmContentCache,
+  cancelCacheWarmup,
 }: AppSettingsDialogProps) {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const importCacheInputRef = useRef<HTMLInputElement | null>(null);
+  const canResumeCacheWarmup =
+    !isCacheWarming &&
+    !!cacheWarmupProgress &&
+    cacheWarmupProgress.remaining > 0;
 
   const progressPercent = cacheWarmupProgress
     ? Math.round(
-        (cacheWarmupProgress.cached / Math.max(cacheWarmupProgress.total, 1)) *
+        (cacheWarmupProgress.processed /
+          Math.max(cacheWarmupProgress.total, 1)) *
           100,
       )
     : 0;
@@ -112,15 +136,21 @@ export function AppSettingsDialog({
               </Button>
               <Button
                 variant="secondary"
-                onClick={() => void warmContentCache()}
-                disabled={isImporting || isLoading || isCacheWarming}
+                onClick={() =>
+                  isCacheWarming ? cancelCacheWarmup() : void warmContentCache()
+                }
+                disabled={isImporting || isLoading}
               >
                 {isCacheWarming ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Download className="h-4 w-4" />
                 )}
-                {isCacheWarming ? 'Salvando cache...' : 'Salvar cache'}
+                {isCacheWarming
+                  ? 'Pausar cache'
+                  : canResumeCacheWarmup
+                    ? 'Retomar cache'
+                    : 'Salvar cache'}
               </Button>
               <Button
                 variant="secondary"
@@ -143,10 +173,14 @@ export function AppSettingsDialog({
               <div className="mt-3 space-y-2 rounded-xl border p-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
                   <span>
-                    {isCacheWarming ? 'Salvando em segundo plano' : 'Ultima execucao'}
+                    {isCacheWarming
+                      ? 'Salvando em segundo plano'
+                      : cacheWarmupProgress.remaining > 0
+                        ? 'Execucao pausada'
+                        : 'Ultima execucao'}
                   </span>
                   <span>
-                    {cacheWarmupProgress.cached}/{cacheWarmupProgress.total} em cache
+                    {cacheWarmupProgress.cached}/{cacheWarmupProgress.total} em cache ({progressPercent}%)
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -160,6 +194,16 @@ export function AppSettingsDialog({
                   {cacheWarmupProgress.success} | Ja em cache:{' '}
                   {cacheWarmupProgress.alreadyCached} | Falhas:{' '}
                   {cacheWarmupProgress.failed}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Tempo estimado:{' '}
+                  {isCacheWarming
+                    ? formatEstimatedTime(
+                        cacheWarmupProgress.estimatedRemainingMs,
+                      )
+                    : cacheWarmupProgress.remaining > 0
+                      ? 'Pausado'
+                      : 'Concluido'}
                 </p>
                 {cacheWarmupProgress.currentTitle ? (
                   <p className="line-clamp-2 text-xs text-muted-foreground">

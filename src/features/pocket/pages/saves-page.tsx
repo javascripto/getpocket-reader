@@ -81,6 +81,7 @@ export function SavesPage() {
     exportCsv,
     exportContentCache,
     warmContentCache,
+    cancelCacheWarmup,
     clearAll,
   } = usePocket();
 
@@ -644,6 +645,7 @@ export function SavesPage() {
                     exportCsv={exportCsv}
                     exportContentCache={exportContentCache}
                     warmContentCache={warmContentCache}
+                    cancelCacheWarmup={cancelCacheWarmup}
                   />
                 </div>
               </TooltipTrigger>

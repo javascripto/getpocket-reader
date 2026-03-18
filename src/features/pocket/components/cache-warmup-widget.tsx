@@ -4,8 +4,28 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { usePocket } from '@/features/pocket/context/pocket-context';
 
+function formatEstimatedTime(remainingMs: number | null) {
+  if (remainingMs === null) {
+    return 'Calculando tempo restante...';
+  }
+
+  if (remainingMs <= 0) {
+    return 'Concluindo...';
+  }
+
+  const totalSeconds = Math.ceil(remainingMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes > 0) {
+    return `Tempo estimado: ${minutes}m ${seconds}s`;
+  }
+
+  return `Tempo estimado: ${seconds}s`;
+}
+
 export function CacheWarmupWidget() {
-  const { isCacheWarming, cacheWarmupProgress } = usePocket();
+  const { isCacheWarming, cacheWarmupProgress, cancelCacheWarmup } = usePocket();
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
@@ -20,7 +40,7 @@ export function CacheWarmupWidget() {
     }
 
     return Math.round(
-      (cacheWarmupProgress.cached /
+      (cacheWarmupProgress.processed /
         Math.max(cacheWarmupProgress.total, 1)) *
         100,
     );
@@ -33,6 +53,9 @@ export function CacheWarmupWidget() {
   const isFinished =
     !isCacheWarming &&
     cacheWarmupProgress.remaining === 0;
+  const isPaused =
+    !isCacheWarming &&
+    cacheWarmupProgress.remaining > 0;
 
   return (
     <div className="pointer-events-none fixed right-4 bottom-4 z-50 w-[min(360px,calc(100vw-2rem))]">
@@ -50,10 +73,14 @@ export function CacheWarmupWidget() {
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium">
-                {isCacheWarming ? 'Salvando cache em segundo plano' : 'Cache finalizado'}
+                {isCacheWarming
+                  ? 'Salvando cache em segundo plano'
+                  : isPaused
+                    ? 'Cache pausado'
+                    : 'Cache finalizado'}
               </p>
               <p className="text-xs text-muted-foreground">
-                {cacheWarmupProgress.cached}/{cacheWarmupProgress.total} em cache
+                {cacheWarmupProgress.cached}/{cacheWarmupProgress.total} em cache ({progressPercent}%)
               </p>
             </div>
           </div>
@@ -63,8 +90,13 @@ export function CacheWarmupWidget() {
             variant="ghost"
             size="icon-sm"
             className="shrink-0"
-            onClick={() => setDismissed(true)}
-            disabled={isCacheWarming}
+            onClick={() => {
+              if (isCacheWarming) {
+                cancelCacheWarmup();
+              }
+
+              setDismissed(true);
+            }}
             aria-label="Fechar progresso do cache"
           >
             <X className="h-4 w-4" />
@@ -83,6 +115,13 @@ export function CacheWarmupWidget() {
           {cacheWarmupProgress.success} | Ja em cache:{' '}
           {cacheWarmupProgress.alreadyCached} | Falhas:{' '}
           {cacheWarmupProgress.failed}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {isCacheWarming
+            ? formatEstimatedTime(cacheWarmupProgress.estimatedRemainingMs)
+            : cacheWarmupProgress.remaining > 0
+              ? 'Tempo estimado: pausado'
+              : 'Tempo estimado: concluido'}
         </p>
 
         {cacheWarmupProgress.currentTitle ? (

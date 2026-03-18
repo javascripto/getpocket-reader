@@ -53,9 +53,12 @@ export interface ContentCacheArchive {
 export interface ContentCacheWarmupProgress {
   total: number;
   cached: number;
+  processed: number;
   remaining: number;
   success: number;
   alreadyCached: number;
   failed: number;
   currentTitle: string;
+  startedAt: number;
+  estimatedRemainingMs: number | null;
 }
