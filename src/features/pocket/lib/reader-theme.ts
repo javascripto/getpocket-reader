@@ -10,7 +10,7 @@ export const READER_PREFERENCES_KEY = 'pocket-offline-reader-preferences-v1';
 export const defaultReaderPreferences: ReaderPreferences = {
   theme: 'system',
   fontFamily: 'sans',
-  fontSize: 19,
+  fontSize: 14,
   lineHeight: 1.75,
   contentWidth: 760,
 };
@@ -57,7 +57,7 @@ export function loadReaderPreferences(): ReaderPreferences {
         : defaultReaderPreferences.fontFamily,
       fontSize:
         typeof parsed.fontSize === 'number'
-          ? Math.min(30, Math.max(14, parsed.fontSize))
+          ? Math.min(30, Math.max(10, parsed.fontSize))
           : defaultReaderPreferences.fontSize,
       lineHeight:
         typeof parsed.lineHeight === 'number'

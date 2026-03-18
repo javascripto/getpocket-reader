@@ -147,7 +147,7 @@ export function AppSettingsDialog({
                 Tamanho da fonte: {readerPreferences.fontSize}px
               </span>
               <Slider
-                min={14}
+                min={10}
                 max={30}
                 step={1}
                 value={[readerPreferences.fontSize]}
