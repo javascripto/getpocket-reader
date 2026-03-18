@@ -18,7 +18,7 @@ import {
   exportContentCacheArchive,
   parseContentCacheArchive,
 } from '@/lib/content-cache-archive';
-import { fetchCleanContent } from '@/lib/clean-content';
+import { fetchCleanContent, isDarkreadProxyError } from '@/lib/clean-content';
 import { exportCsvContent, importCsvContent } from '@/lib/pocket-csv';
 import {
   clearAllItems,
@@ -40,7 +40,7 @@ import type {
   ReaderPreferences,
 } from '@/types';
 
-const CACHE_WARMUP_DELAY_MS = 1500;
+const CACHE_WARMUP_DELAY_MS = 1000;
 
 interface CreatePostInput {
   title: string;
@@ -403,8 +403,10 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
         try {
           await fetchCleanContent(item.url);
           success += 1;
-        } catch {
-          failed += 1;
+        } catch (error) {
+          if (isDarkreadProxyError(error)) {
+            failed += 1;
+          }
         }
 
         setCacheWarmupProgress(current =>

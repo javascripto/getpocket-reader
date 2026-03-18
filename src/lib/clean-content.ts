@@ -12,6 +12,17 @@ const turndown = new TurndownService({
   bulletListMarker: '-',
 });
 
+class DarkreadProxyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DarkreadProxyError';
+  }
+}
+
+export function isDarkreadProxyError(error: unknown): boolean {
+  return error instanceof DarkreadProxyError;
+}
+
 // Fenced code blocks with auto language detection
 // Handles both <pre><code> and <pre><span> (darkread sometimes uses spans)
 turndown.addRule('fencedCodeBlock', {
@@ -32,18 +43,18 @@ turndown.addRule('fencedCodeBlock', {
 
 async function fetchViaDarkread(url: string): Promise<{ title: string; content: string }> {
   const res = await fetch(`${DARKREAD_PROXY}/?cors=true&url=${encodeURIComponent(url)}`);
-  if (!res.ok) throw new Error('Falha ao obter conteúdo via darkread proxy.');
+  if (!res.ok) throw new DarkreadProxyError('Falha ao obter conteúdo via darkread proxy.');
 
   const html = await res.text();
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const articleEl = doc.querySelector('article') ?? doc.querySelector('main') ?? doc.body;
-  if (!articleEl?.textContent?.trim()) throw new Error('Não foi possível extrair o conteúdo deste link.');
+  if (!articleEl?.textContent?.trim()) throw new DarkreadProxyError('Não foi possível extrair o conteúdo deste link.');
 
   const text = articleEl.textContent ?? '';
 
   // Darkread shows this when it can't access the article
   if (text.includes('That article cannot be read') || text.trimStart().startsWith('self.__next_f')) {
-    throw new Error('Este artigo não pode ser lido (pode estar atrás de paywall ou inacessível).');
+    throw new DarkreadProxyError('Este artigo não pode ser lido (pode estar atrás de paywall ou inacessível).');
   }
 
   const title = doc.querySelector('h1')?.textContent?.trim() || 'Leitura clean (via darkread)';
