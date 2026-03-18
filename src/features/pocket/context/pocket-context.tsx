@@ -28,6 +28,7 @@ import {
   getContentCache,
   listItems,
   listContentCache,
+  normalizePocketUrl,
   saveItem,
   upsertContentCacheEntries,
   upsertItems,
@@ -76,6 +77,7 @@ interface PocketContextValue {
   isCacheImporting: boolean;
   isCacheWarming: boolean;
   cacheWarmupProgress: ContentCacheWarmupProgress | null;
+  cacheWarmupFailedUrls: Set<string>;
   readerPreferences: ReaderPreferences;
   activeTheme: AppTheme;
   setReaderPreferences: (patch: Partial<ReaderPreferences>) => void;
@@ -105,6 +107,9 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
   const [isCacheWarming, setIsCacheWarming] = useState(false);
   const [cacheWarmupProgress, setCacheWarmupProgress] =
     useState<ContentCacheWarmupProgress | null>(null);
+  const [cacheWarmupFailedUrls, setCacheWarmupFailedUrls] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [readerPreferences, setReaderPreferencesState] =
     useState<ReaderPreferences>(loadReaderPreferences);
   const isCacheWarmingRef = useRef(false);
@@ -406,6 +411,8 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
       let processedPending = 0;
 
       for (const [index, item] of pendingItems.entries()) {
+        const normalizedItemUrl = normalizePocketUrl(item.url);
+
         if (cancelCacheWarmupRef.current) {
           break;
         }
@@ -421,6 +428,15 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
 
         const cached = await getContentCache(item.url);
         if (cached) {
+          setCacheWarmupFailedUrls(current => {
+            if (!current.has(normalizedItemUrl)) {
+              return current;
+            }
+
+            const next = new Set(current);
+            next.delete(normalizedItemUrl);
+            return next;
+          });
           alreadyCached += 1;
           processedPending += 1;
           const processed = initialCachedCount + processedPending;
@@ -446,9 +462,23 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
 
         try {
           await fetchCleanContent(item.url, { preferProxy: true });
+          setCacheWarmupFailedUrls(current => {
+            if (!current.has(normalizedItemUrl)) {
+              return current;
+            }
+
+            const next = new Set(current);
+            next.delete(normalizedItemUrl);
+            return next;
+          });
           success += 1;
         } catch (error) {
           if (isDarkreadProxyError(error)) {
+            setCacheWarmupFailedUrls(current => {
+              const next = new Set(current);
+              next.add(normalizedItemUrl);
+              return next;
+            });
             failed += 1;
           }
         }
@@ -545,6 +575,7 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
       isCacheImporting,
       isCacheWarming,
       cacheWarmupProgress,
+      cacheWarmupFailedUrls,
       readerPreferences,
       activeTheme,
       setReaderPreferences,
@@ -565,6 +596,7 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       cacheWarmupProgress,
+      cacheWarmupFailedUrls,
       clearAll,
       createPost,
       deletePost,
@@ -579,6 +611,7 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
       isImporting,
       isLoading,
       items,
+      cacheWarmupFailedUrls,
       refreshItems,
       setReaderPreferences,
       toggleArchive,

@@ -41,15 +41,29 @@ import { AppSettingsDialog } from '@/features/pocket/components/app-settings-dia
 import { PocketItemCard } from '@/features/pocket/components/pocket-item-card';
 import { usePocket } from '@/features/pocket/context/pocket-context';
 import { readerThemeColors } from '@/features/pocket/lib/reader-theme';
-import { normalizePocketUrl, searchContentCache } from '@/lib/pocket-db';
+import {
+  listContentCache,
+  normalizePocketUrl,
+  searchContentCache,
+} from '@/lib/pocket-db';
 import type { PocketItem, PocketItemStatus, PocketViewMode } from '@/types';
 
-type SidebarFilter = 'all' | 'unread' | 'archive';
+type SidebarFilter =
+  | 'all'
+  | 'unread'
+  | 'archive'
+  | 'missing-cache'
+  | 'cached';
 
 const LIST_SCROLL_STORAGE_KEY = 'pocket-saves-scroll-v1';
 
 function parseSidebarFilter(value: string | null): SidebarFilter {
-  return value === 'unread' || value === 'archive' ? value : 'all';
+  return value === 'unread' ||
+    value === 'archive' ||
+    value === 'missing-cache' ||
+    value === 'cached'
+    ? value
+    : 'all';
 }
 
 function parseBooleanParam(value: string | null): boolean {
@@ -67,6 +81,7 @@ export function SavesPage() {
     isCacheImporting,
     isCacheWarming,
     cacheWarmupProgress,
+    cacheWarmupFailedUrls,
     readerPreferences,
     activeTheme,
     setReaderPreferences,
@@ -134,6 +149,9 @@ export function SavesPage() {
   const [cachedSearchMatches, setCachedSearchMatches] = useState<Set<string>>(
     () => new Set(),
   );
+  const [cachedContentUrls, setCachedContentUrls] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [isSearchingCachedContent, setIsSearchingCachedContent] =
     useState(false);
   const hasRestoredScrollRef = useRef(false);
@@ -155,11 +173,27 @@ export function SavesPage() {
     const loweredTerm = searchTerm.trim().toLowerCase();
 
     return items.filter(item => {
+      const normalizedItemUrl = normalizePocketUrl(item.url);
+
       if (sidebarFilter === 'unread' && item.status !== 'unread') {
         return false;
       }
 
       if (sidebarFilter === 'archive' && item.status !== 'archive') {
+        return false;
+      }
+
+      if (
+        sidebarFilter === 'missing-cache' &&
+        cachedContentUrls.has(normalizedItemUrl)
+      ) {
+        return false;
+      }
+
+      if (
+        sidebarFilter === 'cached' &&
+        !cachedContentUrls.has(normalizedItemUrl)
+      ) {
         return false;
       }
 
@@ -183,10 +217,11 @@ export function SavesPage() {
         item.title.toLowerCase().includes(loweredTerm) ||
         item.url.toLowerCase().includes(loweredTerm) ||
         item.tags.some(tag => tag.toLowerCase().includes(loweredTerm)) ||
-        cachedSearchMatches.has(normalizePocketUrl(item.url))
+        cachedSearchMatches.has(normalizedItemUrl)
       );
     });
   }, [
+    cachedContentUrls,
     cachedSearchMatches,
     items,
     onlyFavorites,
@@ -249,6 +284,25 @@ export function SavesPage() {
       window.clearTimeout(timeoutId);
     };
   }, [searchTerm]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void listContentCache().then(entries => {
+      if (!cancelled) {
+        setCachedContentUrls(new Set(entries.map(entry => entry.url)));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    cacheWarmupProgress?.cached,
+    cacheWarmupProgress?.failed,
+    isCacheImporting,
+    items.length,
+  ]);
 
   useEffect(() => {
     const nextParams = new URLSearchParams();
@@ -493,6 +547,40 @@ export function SavesPage() {
             <span>Archive</span>
             <span>
               {items.filter(item => item.status === 'archive').length}
+            </span>
+          </button>
+          <button
+            type="button"
+            className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${sidebarFilter === 'missing-cache' ? 'bg-accent font-semibold text-accent-foreground' : 'text-foreground hover:bg-accent/60'}`}
+            onClick={() => {
+              setSidebarFilter('missing-cache');
+              onAction?.();
+            }}
+          >
+            <span>Fora do cache</span>
+            <span>
+              {
+                items.filter(
+                  item => !cachedContentUrls.has(normalizePocketUrl(item.url)),
+                ).length
+              }
+            </span>
+          </button>
+          <button
+            type="button"
+            className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${sidebarFilter === 'cached' ? 'bg-accent font-semibold text-accent-foreground' : 'text-foreground hover:bg-accent/60'}`}
+            onClick={() => {
+              setSidebarFilter('cached');
+              onAction?.();
+            }}
+          >
+            <span>Leitura offline</span>
+            <span>
+              {
+                items.filter(item =>
+                  cachedContentUrls.has(normalizePocketUrl(item.url)),
+                ).length
+              }
             </span>
           </button>
 
@@ -918,6 +1006,17 @@ export function SavesPage() {
                               <PocketItemCard
                                 item={item}
                                 viewMode={viewMode}
+                                cacheStatus={
+                                  cacheWarmupFailedUrls.has(
+                                    normalizePocketUrl(item.url),
+                                  )
+                                    ? 'failed'
+                                    : cachedContentUrls.has(
+                                          normalizePocketUrl(item.url),
+                                        )
+                                      ? 'cached'
+                                      : 'missing'
+                                }
                                 onOpen={id =>
                                   navigate({
                                     pathname: `/reader/${id}`,

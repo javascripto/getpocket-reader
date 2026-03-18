@@ -1,4 +1,11 @@
-import { Archive, ExternalLink, Star, Tag, Trash2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  Archive,
+  ExternalLink,
+  Star,
+  Tag,
+  Trash2,
+} from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,6 +42,7 @@ function formatDate(epochMs: number): string {
 interface PocketItemCardProps {
   item: PocketItem;
   viewMode: PocketViewMode;
+  cacheStatus: 'cached' | 'missing' | 'failed';
   onOpen: (id: string) => void;
   onToggleFavorite: (item: PocketItem) => void;
   onToggleArchive: (item: PocketItem) => void;
@@ -46,6 +54,7 @@ interface PocketItemCardProps {
 export function PocketItemCard({
   item,
   viewMode,
+  cacheStatus,
   onOpen,
   onToggleFavorite,
   onToggleArchive,
@@ -54,6 +63,8 @@ export function PocketItemCard({
   onRequestDelete,
 }: PocketItemCardProps) {
   const host = hostFromUrl(item.url);
+  const hasCacheWarmupError = cacheStatus === 'failed';
+  const isMissingFromCache = cacheStatus === 'missing';
   const palette = ['#f3b0b9', '#b8e1d8', '#bcd7f7', '#f5d8a8', '#d2c7ee'];
   const color =
     palette[Math.abs(host.length + item.title.length) % palette.length];
@@ -63,7 +74,10 @@ export function PocketItemCard({
       <article
         className="overflow-hidden rounded-3xl border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
         style={{
-          borderColor: themeColors.border,
+          borderColor:
+            hasCacheWarmupError || isMissingFromCache
+              ? '#f59e0b'
+              : themeColors.border,
           background: themeColors.cardBackground,
         }}
       >
@@ -99,6 +113,23 @@ export function PocketItemCard({
               {formatDate(item.timeAdded)}
             </p>
             <div className="mt-3 flex flex-wrap gap-1.5">
+              {hasCacheWarmupError ? (
+                <Badge
+                  className="border-rose-300 bg-rose-100 text-rose-900"
+                  variant="outline"
+                >
+                  <AlertTriangle className="mr-1 h-3 w-3" />
+                  Falha no cache
+                </Badge>
+              ) : isMissingFromCache ? (
+                <Badge
+                  className="border-amber-300 bg-amber-100 text-amber-900"
+                  variant="outline"
+                >
+                  <AlertTriangle className="mr-1 h-3 w-3" />
+                  Fora do cache
+                </Badge>
+              ) : null}
               {item.tags.slice(0, 3).map(tagName => (
                 <Badge
                   key={tagName}
@@ -201,7 +232,10 @@ export function PocketItemCard({
     <article
       className="flex flex-col gap-3 rounded-2xl border p-3 shadow-sm transition hover:shadow-md sm:flex-row sm:items-start sm:gap-4"
       style={{
-        borderColor: themeColors.border,
+        borderColor:
+          hasCacheWarmupError || isMissingFromCache
+            ? '#f59e0b'
+            : themeColors.border,
         background: themeColors.cardBackground,
       }}
     >
@@ -231,6 +265,23 @@ export function PocketItemCard({
           <span>{item.status === 'archive' ? 'Archive' : 'Unread'}</span>
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
+          {hasCacheWarmupError ? (
+            <Badge
+              className="border-rose-300 bg-rose-100 text-rose-900"
+              variant="outline"
+            >
+              <AlertTriangle className="mr-1 h-3 w-3" />
+              Falha no cache
+            </Badge>
+          ) : isMissingFromCache ? (
+            <Badge
+              className="border-amber-300 bg-amber-100 text-amber-900"
+              variant="outline"
+            >
+              <AlertTriangle className="mr-1 h-3 w-3" />
+              Fora do cache
+            </Badge>
+          ) : null}
           {item.tags.slice(0, 2).map(tagName => (
             <Badge
               key={tagName}
