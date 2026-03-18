@@ -445,7 +445,7 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-          await fetchCleanContent(item.url);
+          await fetchCleanContent(item.url, { preferProxy: true });
           success += 1;
         } catch (error) {
           if (isDarkreadProxyError(error)) {

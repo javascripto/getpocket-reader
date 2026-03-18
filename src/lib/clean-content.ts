@@ -66,7 +66,7 @@ async function fetchViaDarkread(url: string): Promise<{ title: string; content: 
 
   try {
     res = await fetchWithTimeout(
-      `${DARKREAD_PROXY}/?cors=true&url=${encodeURIComponent(url)}`,
+      `${DARKREAD_PROXY}/darkread?cors=true&url=${encodeURIComponent(url)}`,
       {},
       DARKREAD_PROXY_TIMEOUT_MS,
     );
@@ -97,7 +97,14 @@ async function fetchViaDarkread(url: string): Promise<{ title: string; content: 
   return { title, content: markdown };
 }
 
-export async function fetchCleanContent(targetUrl: string): Promise<{
+interface FetchCleanContentOptions {
+  preferProxy?: boolean;
+}
+
+export async function fetchCleanContent(
+  targetUrl: string,
+  options?: FetchCleanContentOptions,
+): Promise<{
   title: string;
   content: string;
   format: 'plain' | 'markdown';
@@ -111,31 +118,33 @@ export async function fetchCleanContent(targetUrl: string): Promise<{
     };
   }
 
-  try {
-    const response = await fetchWithTimeout(
-      targetUrl,
-      { mode: 'cors' },
-      ORIGINAL_CONTENT_TIMEOUT_MS,
-    );
-    if (!response.ok) {
-      throw new Error('Falha ao baixar conteúdo original.');
-    }
+  if (!options?.preferProxy) {
+    try {
+      const response = await fetchWithTimeout(
+        targetUrl,
+        { mode: 'cors' },
+        ORIGINAL_CONTENT_TIMEOUT_MS,
+      );
+      if (!response.ok) {
+        throw new Error('Falha ao baixar conteúdo original.');
+      }
 
-    const html = await response.text();
-    const document = new DOMParser().parseFromString(html, 'text/html');
-    const article = new Readability(document).parse();
+      const html = await response.text();
+      const document = new DOMParser().parseFromString(html, 'text/html');
+      const article = new Readability(document).parse();
 
-    if (article?.content) {
-      const result = {
-        title: article.title || 'Leitura clean',
-        content: turndown.turndown(article.content),
-        format: 'markdown' as const,
-      };
-      await setContentCache(targetUrl, { ...result, cachedAt: Date.now() });
-      return result;
+      if (article?.content) {
+        const result = {
+          title: article.title || 'Leitura clean',
+          content: turndown.turndown(article.content),
+          format: 'markdown' as const,
+        };
+        await setContentCache(targetUrl, { ...result, cachedAt: Date.now() });
+        return result;
+      }
+    } catch {
+      // fallback for CORS-restricted websites
     }
-  } catch {
-    // fallback for CORS-restricted websites
   }
 
   const { title, content } = await fetchViaDarkread(targetUrl);
