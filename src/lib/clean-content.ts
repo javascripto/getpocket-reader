@@ -2,6 +2,8 @@ import { Readability } from '@mozilla/readability';
 import hljs from 'highlight.js';
 import TurndownService from 'turndown';
 
+import { getContentCache, setContentCache } from './pocket-db';
+
 const DARKREAD_PROXY = 'https://darkread-proxy.vercel.app';
 
 const turndown = new TurndownService({
@@ -54,6 +56,15 @@ export async function fetchCleanContent(targetUrl: string): Promise<{
   content: string;
   format: 'plain' | 'markdown';
 }> {
+  const cached = await getContentCache(targetUrl);
+  if (cached) {
+    return {
+      title: cached.title,
+      content: cached.content,
+      format: cached.format,
+    };
+  }
+
   try {
     const response = await fetch(targetUrl, { mode: 'cors' });
     if (!response.ok) {
@@ -65,17 +76,20 @@ export async function fetchCleanContent(targetUrl: string): Promise<{
     const article = new Readability(document).parse();
 
     if (article?.content) {
-      const markdown = turndown.turndown(article.content);
-      return {
+      const result = {
         title: article.title || 'Leitura clean',
-        content: markdown,
-        format: 'markdown',
+        content: turndown.turndown(article.content),
+        format: 'markdown' as const,
       };
+      await setContentCache(targetUrl, { ...result, cachedAt: Date.now() });
+      return result;
     }
   } catch {
     // fallback for CORS-restricted websites
   }
 
   const { title, content } = await fetchViaDarkread(targetUrl);
-  return { title, content, format: 'markdown' };
+  const result = { title, content, format: 'markdown' as const };
+  await setContentCache(targetUrl, { ...result, cachedAt: Date.now() });
+  return result;
 }

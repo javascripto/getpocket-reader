@@ -1,21 +1,24 @@
 import { openDB } from 'idb';
 
-import type { PocketItem } from '@/types';
+import type { ContentCacheEntry, PocketItem } from '@/types';
 
 const DB_NAME = 'pocket-offline-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_ITEMS = 'items';
+const STORE_CONTENT_CACHE = 'content-cache';
 
 const database = openDB(DB_NAME, DB_VERSION, {
   upgrade(db) {
-    if (db.objectStoreNames.contains(STORE_ITEMS)) {
-      return;
+    if (!db.objectStoreNames.contains(STORE_ITEMS)) {
+      const store = db.createObjectStore(STORE_ITEMS, { keyPath: 'id' });
+      store.createIndex('by-status', 'status', { unique: false });
+      store.createIndex('by-favorite', 'favorite', { unique: false });
+      store.createIndex('by-timeAdded', 'timeAdded', { unique: false });
     }
 
-    const store = db.createObjectStore(STORE_ITEMS, { keyPath: 'id' });
-    store.createIndex('by-status', 'status', { unique: false });
-    store.createIndex('by-favorite', 'favorite', { unique: false });
-    store.createIndex('by-timeAdded', 'timeAdded', { unique: false });
+    if (!db.objectStoreNames.contains(STORE_CONTENT_CACHE)) {
+      db.createObjectStore(STORE_CONTENT_CACHE, { keyPath: 'url' });
+    }
   },
 });
 
@@ -97,4 +100,38 @@ export async function clearAllItems(): Promise<void> {
 export async function deleteItemById(itemId: string): Promise<void> {
   const db = await database;
   await db.delete(STORE_ITEMS, itemId);
+}
+
+export async function getContentCache(
+  rawUrl: string,
+): Promise<ContentCacheEntry | undefined> {
+  try {
+    const db = await database;
+    const url = normalizeUrl(rawUrl);
+    return await db.get(STORE_CONTENT_CACHE, url);
+  } catch {
+    return undefined;
+  }
+}
+
+export async function setContentCache(
+  rawUrl: string,
+  entry: Omit<ContentCacheEntry, 'url'>,
+): Promise<void> {
+  try {
+    const db = await database;
+    const url = normalizeUrl(rawUrl);
+    await db.put(STORE_CONTENT_CACHE, { url, ...entry });
+  } catch {
+    // Silent no-op — cache write failure must not break article loading
+  }
+}
+
+export async function clearContentCache(): Promise<void> {
+  try {
+    const db = await database;
+    await db.clear(STORE_CONTENT_CACHE);
+  } catch {
+    // Silent no-op
+  }
 }

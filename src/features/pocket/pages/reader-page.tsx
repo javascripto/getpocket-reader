@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -240,7 +240,7 @@ export function ReaderPage() {
         </p>
         {readerMode === 'clean' ? (
           <article
-            className="rounded-2xl border p-6 shadow-sm"
+            className="rounded-2xl border px-6 py-6 shadow-sm md:px-10"
             style={{
               borderColor: colors.border,
               background: colors.cardBackground,
@@ -248,9 +248,13 @@ export function ReaderPage() {
             }}
           >
             {cleanLoading && (
-              <p style={{ color: colors.mutedText }}>
-                Montando leitura clean...
-              </p>
+              <div
+                className="flex items-center gap-3"
+                style={{ color: colors.mutedText }}
+              >
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <p>Montando leitura clean...</p>
+              </div>
             )}
             {cleanError && <p className="text-red-600">{cleanError}</p>}
             {!cleanLoading && !cleanError && (

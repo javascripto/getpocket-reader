@@ -16,6 +16,7 @@ import {
 import { exportCsvContent, importCsvContent } from '@/lib/pocket-csv';
 import {
   clearAllItems,
+  clearContentCache,
   createPocketItem,
   deleteItemById,
   listItems,
@@ -272,6 +273,7 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
 
   const clearAll = useCallback(async () => {
     await clearAllItems();
+    await clearContentCache();
     await refreshItems(true);
   }, [refreshItems]);
 

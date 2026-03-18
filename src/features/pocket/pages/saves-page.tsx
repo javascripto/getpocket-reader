@@ -70,7 +70,10 @@ export function SavesPage() {
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [onlyUntagged, setOnlyUntagged] = useState(false);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<PocketViewMode>('cards');
+  const [viewMode, setViewMode] = useState<PocketViewMode>(() => {
+    const stored = localStorage.getItem('pocket-view-mode-v1');
+    return stored === 'list' || stored === 'cards' ? stored : 'cards';
+  });
 
   const [newTitle, setNewTitle] = useState('');
   const [newUrl, setNewUrl] = useState('');
@@ -168,6 +171,10 @@ export function SavesPage() {
 
     return () => observer.disconnect();
   }, [resultScrollElement]);
+
+  useEffect(() => {
+    localStorage.setItem('pocket-view-mode-v1', viewMode);
+  }, [viewMode]);
 
   const cardColumns = useMemo(() => {
     if (viewMode === 'list') {

@@ -35,3 +35,11 @@ export interface PocketCsvRow {
   status?: string;
   favorite?: string;
 }
+
+export interface ContentCacheEntry {
+  url: string;
+  title: string;
+  content: string;
+  format: 'plain' | 'markdown';
+  cachedAt: number;
+}
