@@ -135,3 +135,33 @@ export async function clearContentCache(): Promise<void> {
     // Silent no-op
   }
 }
+
+export async function listContentCache(): Promise<ContentCacheEntry[]> {
+  try {
+    const db = await database;
+    const entries = await db.getAll(STORE_CONTENT_CACHE);
+    return entries.sort((a, b) => a.url.localeCompare(b.url));
+  } catch {
+    return [];
+  }
+}
+
+export async function upsertContentCacheEntries(
+  entries: ContentCacheEntry[],
+): Promise<void> {
+  try {
+    const db = await database;
+    const tx = db.transaction(STORE_CONTENT_CACHE, 'readwrite');
+
+    for (const entry of entries) {
+      await tx.store.put({
+        ...entry,
+        url: normalizeUrl(entry.url),
+      });
+    }
+
+    await tx.done;
+  } catch {
+    // Silent no-op
+  }
+}

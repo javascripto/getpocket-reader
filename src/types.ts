@@ -43,3 +43,18 @@ export interface ContentCacheEntry {
   format: 'plain' | 'markdown';
   cachedAt: number;
 }
+
+export interface ContentCacheArchive {
+  version: 1;
+  exportedAt: number;
+  entries: ContentCacheEntry[];
+}
+
+export interface ContentCacheWarmupProgress {
+  total: number;
+  completed: number;
+  success: number;
+  skipped: number;
+  failed: number;
+  currentTitle: string;
+}

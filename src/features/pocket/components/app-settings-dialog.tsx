@@ -1,4 +1,4 @@
-import { Download, Settings2, Upload } from 'lucide-react';
+import { Download, Loader2, Settings2, Upload } from 'lucide-react';
 import { useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -16,28 +16,62 @@ import type { ReaderFontFamily, ReaderPreferences, ReaderTheme } from '@/types';
 
 interface AppSettingsDialogProps {
   isImporting: boolean;
+  isCacheImporting: boolean;
+  isCacheWarming: boolean;
   isLoading: boolean;
+  cacheWarmupProgress: {
+    total: number;
+    completed: number;
+    success: number;
+    skipped: number;
+    failed: number;
+    currentTitle: string;
+  } | null;
   readerPreferences: ReaderPreferences;
   setReaderPreferences: (patch: Partial<ReaderPreferences>) => void;
   importCsvFile: (file: File) => Promise<void>;
+  importCacheFile: (file: File) => Promise<void>;
   exportCsv: () => void;
+  exportContentCache: () => Promise<void>;
+  warmContentCache: () => Promise<void>;
 }
 
 export function AppSettingsDialog({
   isImporting,
+  isCacheImporting,
+  isCacheWarming,
   isLoading,
+  cacheWarmupProgress,
   readerPreferences,
   setReaderPreferences,
   importCsvFile,
+  importCacheFile,
   exportCsv,
+  exportContentCache,
+  warmContentCache,
 }: AppSettingsDialogProps) {
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const importCacheInputRef = useRef<HTMLInputElement | null>(null);
+
+  const progressPercent = cacheWarmupProgress
+    ? Math.round(
+        (cacheWarmupProgress.completed / Math.max(cacheWarmupProgress.total, 1)) *
+          100,
+      )
+    : 0;
 
   function onClickImport() {
     if (isImporting) {
       return;
     }
     importInputRef.current?.click();
+  }
+
+  function onClickImportCache() {
+    if (isCacheImporting) {
+      return;
+    }
+    importCacheInputRef.current?.click();
   }
 
   return (
@@ -75,7 +109,63 @@ export function AppSettingsDialog({
                 <Download className="h-4 w-4" />
                 Exportar CSV
               </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void warmContentCache()}
+                disabled={isImporting || isLoading || isCacheWarming}
+              >
+                {isCacheWarming ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {isCacheWarming ? 'Salvando cache...' : 'Salvar cache'}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={onClickImportCache}
+                disabled={isCacheImporting || isCacheWarming}
+              >
+                <Upload className="h-4 w-4" />
+                {isCacheImporting ? 'Importando cache...' : 'Importar cache'}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void exportContentCache()}
+                disabled={isCacheImporting || isCacheWarming}
+              >
+                <Download className="h-4 w-4" />
+                Exportar cache JSON
+              </Button>
             </div>
+            {cacheWarmupProgress && (
+              <div className="mt-3 space-y-2 rounded-xl border p-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span>
+                    {isCacheWarming ? 'Salvando em segundo plano' : 'Ultima execucao'}
+                  </span>
+                  <span>
+                    {cacheWarmupProgress.completed}/{cacheWarmupProgress.total}
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-[width] duration-300"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Novos: {cacheWarmupProgress.success} | Ja em cache:{' '}
+                  {cacheWarmupProgress.skipped} | Falhas:{' '}
+                  {cacheWarmupProgress.failed}
+                </p>
+                {cacheWarmupProgress.currentTitle ? (
+                  <p className="line-clamp-2 text-xs text-muted-foreground">
+                    Atual: {cacheWarmupProgress.currentTitle}
+                  </p>
+                ) : null}
+              </div>
+            )}
           </div>
 
           <Separator />
@@ -207,6 +297,19 @@ export function AppSettingsDialog({
             const file = event.target.files?.[0];
             if (file) {
               void importCsvFile(file);
+            }
+            event.currentTarget.value = '';
+          }}
+        />
+        <input
+          ref={importCacheInputRef}
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={event => {
+            const file = event.target.files?.[0];
+            if (file) {
+              void importCacheFile(file);
             }
             event.currentTarget.value = '';
           }}

@@ -1,7 +1,7 @@
 import { ArrowLeft, ExternalLink, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import {
   oneDark,
@@ -35,16 +35,23 @@ function hostFromUrl(url: string): string {
 
 export function ReaderPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { itemId } = useParams();
   const {
     items,
     isLoading,
     isImporting,
+    isCacheImporting,
+    isCacheWarming,
+    cacheWarmupProgress,
     readerPreferences,
     activeTheme,
     setReaderPreferences,
     importCsvFile,
+    importCacheFile,
     exportCsv,
+    exportContentCache,
+    warmContentCache,
   } = usePocket();
 
   const [readerMode, setReaderMode] = useState<ReaderMode>('clean');
@@ -93,6 +100,18 @@ export function ReaderPage() {
   const readerFont = fontFamilyForReader(readerPreferences.fontFamily);
   const syntaxTheme = activeTheme === 'dark' ? oneDark : oneLight;
 
+  function navigateBackToSaves() {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate({
+      pathname: '/',
+      search: location.search,
+    });
+  }
+
   if (isLoading) {
     return (
       <main
@@ -112,7 +131,7 @@ export function ReaderPage() {
       >
         <p className="mb-4">Post não encontrado.</p>
         <Button
-          onClick={() => navigate('/')}
+          onClick={navigateBackToSaves}
           aria-label="Voltar para saves"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -138,7 +157,7 @@ export function ReaderPage() {
           <Button
             variant="ghost"
             className="absolute left-0 text-current"
-            onClick={() => navigate('/')}
+            onClick={navigateBackToSaves}
             aria-label="Voltar para saves"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -191,11 +210,17 @@ export function ReaderPage() {
                 <div>
                   <AppSettingsDialog
                     isImporting={isImporting}
+                    isCacheImporting={isCacheImporting}
+                    isCacheWarming={isCacheWarming}
                     isLoading={isLoading}
+                    cacheWarmupProgress={cacheWarmupProgress}
                     readerPreferences={readerPreferences}
                     setReaderPreferences={setReaderPreferences}
                     importCsvFile={importCsvFile}
+                    importCacheFile={importCacheFile}
                     exportCsv={exportCsv}
+                    exportContentCache={exportContentCache}
+                    warmContentCache={warmContentCache}
                   />
                 </div>
               </TooltipTrigger>

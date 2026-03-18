@@ -11,8 +11,8 @@ import {
   Pocket,
   Search,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -45,12 +45,27 @@ import type { PocketItem, PocketItemStatus, PocketViewMode } from '@/types';
 
 type SidebarFilter = 'all' | 'unread' | 'archive';
 
+const LIST_SCROLL_STORAGE_KEY = 'pocket-saves-scroll-v1';
+
+function parseSidebarFilter(value: string | null): SidebarFilter {
+  return value === 'unread' || value === 'archive' ? value : 'all';
+}
+
+function parseBooleanParam(value: string | null): boolean {
+  return value === 'true';
+}
+
 export function SavesPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     items,
     isLoading,
     isImporting,
+    isCacheImporting,
+    isCacheWarming,
+    cacheWarmupProgress,
     readerPreferences,
     activeTheme,
     setReaderPreferences,
@@ -61,16 +76,34 @@ export function SavesPage() {
     renameTagAcrossPosts,
     deletePost,
     importCsvFile,
+    importCacheFile,
     exportCsv,
+    exportContentCache,
+    warmContentCache,
     clearAll,
   } = usePocket();
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sidebarFilter, setSidebarFilter] = useState<SidebarFilter>('all');
-  const [onlyFavorites, setOnlyFavorites] = useState(false);
-  const [onlyUntagged, setOnlyUntagged] = useState(false);
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState(
+    () => searchParams.get('q') ?? '',
+  );
+  const [sidebarFilter, setSidebarFilter] = useState<SidebarFilter>(() =>
+    parseSidebarFilter(searchParams.get('filter')),
+  );
+  const [onlyFavorites, setOnlyFavorites] = useState(() =>
+    parseBooleanParam(searchParams.get('favorites')),
+  );
+  const [onlyUntagged, setOnlyUntagged] = useState(() =>
+    parseBooleanParam(searchParams.get('untagged')),
+  );
+  const [selectedTag, setSelectedTag] = useState<string | null>(
+    () => searchParams.get('tag') ?? null,
+  );
   const [viewMode, setViewMode] = useState<PocketViewMode>(() => {
+    const paramValue = searchParams.get('view');
+    if (paramValue === 'list' || paramValue === 'cards') {
+      return paramValue;
+    }
+
     const stored = localStorage.getItem('pocket-view-mode-v1');
     return stored === 'list' || stored === 'cards' ? stored : 'cards';
   });
@@ -96,6 +129,7 @@ export function SavesPage() {
   const [resultScrollElement, setResultScrollElement] =
     useState<HTMLDivElement | null>(null);
   const [resultWidth, setResultWidth] = useState(0);
+  const hasRestoredScrollRef = useRef(false);
   const themeColors = readerThemeColors(activeTheme);
 
   const tagCloud = useMemo(() => {
@@ -175,6 +209,100 @@ export function SavesPage() {
   useEffect(() => {
     localStorage.setItem('pocket-view-mode-v1', viewMode);
   }, [viewMode]);
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams();
+
+    if (searchTerm.trim()) {
+      nextParams.set('q', searchTerm.trim());
+    }
+
+    if (sidebarFilter !== 'all') {
+      nextParams.set('filter', sidebarFilter);
+    }
+
+    if (onlyFavorites) {
+      nextParams.set('favorites', 'true');
+    }
+
+    if (onlyUntagged) {
+      nextParams.set('untagged', 'true');
+    }
+
+    if (selectedTag) {
+      nextParams.set('tag', selectedTag);
+    }
+
+    if (viewMode !== 'cards') {
+      nextParams.set('view', viewMode);
+    }
+
+    const nextSearch = nextParams.toString();
+    if (nextSearch !== searchParams.toString()) {
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [
+    onlyFavorites,
+    onlyUntagged,
+    searchParams,
+    searchTerm,
+    selectedTag,
+    setSearchParams,
+    sidebarFilter,
+    viewMode,
+  ]);
+
+  useEffect(() => {
+    if (!resultScrollElement) {
+      return;
+    }
+
+    const element = resultScrollElement;
+
+    function onScroll() {
+      sessionStorage.setItem(
+        LIST_SCROLL_STORAGE_KEY,
+        JSON.stringify({
+          search: location.search,
+          scrollTop: element.scrollTop,
+        }),
+      );
+    }
+
+    element.addEventListener('scroll', onScroll);
+    return () => element.removeEventListener('scroll', onScroll);
+  }, [location.search, resultScrollElement]);
+
+  useEffect(() => {
+    if (!resultScrollElement || hasRestoredScrollRef.current) {
+      return;
+    }
+
+    const rawValue = sessionStorage.getItem(LIST_SCROLL_STORAGE_KEY);
+    if (!rawValue) {
+      hasRestoredScrollRef.current = true;
+      return;
+    }
+
+    try {
+      const saved = JSON.parse(rawValue) as {
+        search?: string;
+        scrollTop?: number;
+      };
+
+      if (
+        saved.search === location.search &&
+        typeof saved.scrollTop === 'number' &&
+        Number.isFinite(saved.scrollTop)
+      ) {
+        resultScrollElement.scrollTop = saved.scrollTop;
+      }
+    } catch {
+      // Ignore invalid saved scroll state.
+    }
+
+    hasRestoredScrollRef.current = true;
+  }, [location.search, resultScrollElement]);
 
   const cardColumns = useMemo(() => {
     if (viewMode === 'list') {
@@ -466,11 +594,17 @@ export function SavesPage() {
                 <div>
                   <AppSettingsDialog
                     isImporting={isImporting}
+                    isCacheImporting={isCacheImporting}
+                    isCacheWarming={isCacheWarming}
                     isLoading={isLoading}
+                    cacheWarmupProgress={cacheWarmupProgress}
                     readerPreferences={readerPreferences}
                     setReaderPreferences={setReaderPreferences}
                     importCsvFile={importCsvFile}
+                    importCacheFile={importCacheFile}
                     exportCsv={exportCsv}
+                    exportContentCache={exportContentCache}
+                    warmContentCache={warmContentCache}
                   />
                 </div>
               </TooltipTrigger>
@@ -725,7 +859,12 @@ export function SavesPage() {
                               <PocketItemCard
                                 item={item}
                                 viewMode={viewMode}
-                                onOpen={id => navigate(`/reader/${id}`)}
+                                onOpen={id =>
+                                  navigate({
+                                    pathname: `/reader/${id}`,
+                                    search: location.search,
+                                  })
+                                }
                                 onToggleFavorite={entry => {
                                   void toggleFavorite(entry);
                                 }}

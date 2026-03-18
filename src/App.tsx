@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
+import { CacheWarmupWidget } from '@/features/pocket/components/cache-warmup-widget';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { PocketProvider } from '@/features/pocket/context/pocket-context';
 import { ReaderPage } from '@/features/pocket/pages/reader-page';
@@ -29,6 +30,7 @@ export default function App() {
               }
             />
           </Routes>
+          <CacheWarmupWidget />
         </BrowserRouter>
         <Toaster richColors />
       </PocketProvider>
