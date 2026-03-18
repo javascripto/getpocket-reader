@@ -361,18 +361,20 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
 
     isCacheWarmingRef.current = true;
     setIsCacheWarming(true);
+    const initialCachedCount = uniqueItems.length - pendingItems.length;
     setCacheWarmupProgress({
-      total: pendingItems.length,
-      completed: 0,
+      total: uniqueItems.length,
+      cached: initialCachedCount,
+      remaining: pendingItems.length,
       success: 0,
-      skipped: 0,
+      alreadyCached: initialCachedCount,
       failed: 0,
       currentTitle: '',
     });
 
     try {
       let success = 0;
-      let skipped = 0;
+      let alreadyCached = initialCachedCount;
       let failed = 0;
 
       for (const [index, item] of pendingItems.entries()) {
@@ -387,13 +389,17 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
 
         const cached = await getContentCache(item.url);
         if (cached) {
-          skipped += 1;
+          alreadyCached += 1;
           setCacheWarmupProgress(current =>
             current
               ? {
-                  ...current,
-                  completed: index + 1,
-                  skipped,
+                ...current,
+                  cached: alreadyCached + success,
+                  remaining: Math.max(
+                    current.total - (alreadyCached + success),
+                    0,
+                  ),
+                  alreadyCached,
                 }
               : current,
           );
@@ -413,7 +419,11 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
           current
             ? {
                 ...current,
-                completed: index + 1,
+                cached: initialCachedCount + success,
+                remaining: Math.max(
+                  current.total - (initialCachedCount + success),
+                  0,
+                ),
                 success,
                 failed,
               }
@@ -428,7 +438,7 @@ export function PocketProvider({ children }: { children: React.ReactNode }) {
       }
 
       toast.success(
-        `Cache concluido: ${success} novos, ${skipped} ja existentes, ${failed} falhas`,
+        `Cache concluido: ${initialCachedCount + success} em cache, ${success} novos, ${failed} falhas`,
       );
     } finally {
       isCacheWarmingRef.current = false;

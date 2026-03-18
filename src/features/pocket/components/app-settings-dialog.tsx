@@ -21,9 +21,10 @@ interface AppSettingsDialogProps {
   isLoading: boolean;
   cacheWarmupProgress: {
     total: number;
-    completed: number;
+    cached: number;
+    remaining: number;
     success: number;
-    skipped: number;
+    alreadyCached: number;
     failed: number;
     currentTitle: string;
   } | null;
@@ -55,7 +56,7 @@ export function AppSettingsDialog({
 
   const progressPercent = cacheWarmupProgress
     ? Math.round(
-        (cacheWarmupProgress.completed / Math.max(cacheWarmupProgress.total, 1)) *
+        (cacheWarmupProgress.cached / Math.max(cacheWarmupProgress.total, 1)) *
           100,
       )
     : 0;
@@ -145,7 +146,7 @@ export function AppSettingsDialog({
                     {isCacheWarming ? 'Salvando em segundo plano' : 'Ultima execucao'}
                   </span>
                   <span>
-                    {cacheWarmupProgress.completed}/{cacheWarmupProgress.total}
+                    {cacheWarmupProgress.cached}/{cacheWarmupProgress.total} em cache
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -155,8 +156,9 @@ export function AppSettingsDialog({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Novos: {cacheWarmupProgress.success} | Ja em cache:{' '}
-                  {cacheWarmupProgress.skipped} | Falhas:{' '}
+                  Restantes: {cacheWarmupProgress.remaining} | Novos:{' '}
+                  {cacheWarmupProgress.success} | Ja em cache:{' '}
+                  {cacheWarmupProgress.alreadyCached} | Falhas:{' '}
                   {cacheWarmupProgress.failed}
                 </p>
                 {cacheWarmupProgress.currentTitle ? (

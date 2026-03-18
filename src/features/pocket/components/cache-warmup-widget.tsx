@@ -20,7 +20,7 @@ export function CacheWarmupWidget() {
     }
 
     return Math.round(
-      (cacheWarmupProgress.completed /
+      (cacheWarmupProgress.cached /
         Math.max(cacheWarmupProgress.total, 1)) *
         100,
     );
@@ -32,7 +32,7 @@ export function CacheWarmupWidget() {
 
   const isFinished =
     !isCacheWarming &&
-    cacheWarmupProgress.completed >= cacheWarmupProgress.total;
+    cacheWarmupProgress.remaining === 0;
 
   return (
     <div className="pointer-events-none fixed right-4 bottom-4 z-50 w-[min(360px,calc(100vw-2rem))]">
@@ -53,7 +53,7 @@ export function CacheWarmupWidget() {
                 {isCacheWarming ? 'Salvando cache em segundo plano' : 'Cache finalizado'}
               </p>
               <p className="text-xs text-muted-foreground">
-                {cacheWarmupProgress.completed}/{cacheWarmupProgress.total} posts
+                {cacheWarmupProgress.cached}/{cacheWarmupProgress.total} em cache
               </p>
             </div>
           </div>
@@ -79,8 +79,10 @@ export function CacheWarmupWidget() {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Novos: {cacheWarmupProgress.success} | Ja em cache:{' '}
-          {cacheWarmupProgress.skipped} | Falhas: {cacheWarmupProgress.failed}
+          Restantes: {cacheWarmupProgress.remaining} | Novos:{' '}
+          {cacheWarmupProgress.success} | Ja em cache:{' '}
+          {cacheWarmupProgress.alreadyCached} | Falhas:{' '}
+          {cacheWarmupProgress.failed}
         </p>
 
         {cacheWarmupProgress.currentTitle ? (
