@@ -4,8 +4,8 @@ import TurndownService from 'turndown';
 
 import { getContentCache, setContentCache } from './pocket-db';
 
-// const DARKREAD_PROXY = 'https://darkread-proxy.vercel.app';
-const DARKREAD_PROXY = 'http://localhost:3000';
+const DARKREAD_PROXY = 'https://darkread-proxy.vercel.app';
+// const DARKREAD_PROXY = 'http://localhost:3000';
 
 const turndown = new TurndownService({
   headingStyle: 'atx',
